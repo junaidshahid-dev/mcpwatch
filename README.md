@@ -1,6 +1,6 @@
 # MCPWatch
 
-[![CI](https://github.com/junaidshahid-dev/mcp-watch/actions/workflows/ci.yml/badge.svg)](https://github.com/junaidshahid-dev/mcp-watch/actions/workflows/ci.yml)
+[![CI](https://github.com/junaidshahid-dev/mcpwatch/actions/workflows/ci.yml/badge.svg)](https://github.com/junaidshahid-dev/mcpwatch/actions/workflows/ci.yml)
 
 **Uptime, schema-health & incident monitoring for MCP servers.**
 

@@ -89,7 +89,7 @@ See `web-next/README.md`. The FastAPI app also still serves the plain-HTML landi
 ```bash
 cd MCPWatch
 git init && git add -A && git commit -m "MCPWatch: monitoring for MCP servers"
-git remote add origin https://github.com/junaidshahid-dev/mcp-watch.git
+git remote add origin https://github.com/junaidshahid-dev/mcpwatch.git
 git push -u origin main
 ```
 

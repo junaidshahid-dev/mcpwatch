@@ -3,7 +3,7 @@
 # Scheduling is handled by .github/workflows/cron.yml hitting /internal/run-due.
 databases:
   - name: mcpwatch-db
-    plan: basic-256mb        # 'free' works to start; upgrade as you grow
+    plan: free               # free Postgres (expires after 90 days) — upgrade to basic-256mb+ later
     databaseName: mcpwatch
     user: mcpwatch
 
@@ -11,7 +11,7 @@ services:
   - type: web
     name: mcpwatch
     runtime: docker
-    plan: starter
+    plan: free               # free web service (sleeps after ~15 min idle) — upgrade to starter+ later
     healthCheckPath: /health
     autoDeploy: true
     envVars:

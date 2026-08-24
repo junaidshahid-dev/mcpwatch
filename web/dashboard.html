@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MCPWatch — Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=Manrope:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --bg:#070b12; --surface:rgba(255,255,255,.035); --surface2:rgba(255,255,255,.06);
+    --line:rgba(120,200,180,.14); --ink:#e9f0fa; --muted:#8ea3c2; --dim:#5e6f8c;
+    --pulse:#34e6b0; --pulse-glow:rgba(52,230,176,.45);
+    --up:#2ee6a6; --degraded:#ffb020; --down:#ff5c78;
+    --disp:"Sora",system-ui,sans-serif; --body:"Manrope",system-ui,sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+  }
+  *{box-sizing:border-box;margin:0}
+  body{background:var(--bg);color:var(--ink);font-family:var(--body);line-height:1.55;
+    -webkit-font-smoothing:antialiased;min-height:100vh}
+  body::before{content:"";position:fixed;inset:0;z-index:-2;
+    background:radial-gradient(70% 55% at 85% -5%,rgba(52,230,176,.14),transparent 60%),
+      radial-gradient(60% 50% at 0% 5%,rgba(46,90,160,.18),transparent 60%),
+      linear-gradient(180deg,#070b12,#060910 60%)}
+  a{color:inherit;text-decoration:none}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 22px}
+  .mono{font-family:var(--mono)}
+
+  nav{position:sticky;top:0;z-index:40;backdrop-filter:blur(14px);
+    background:rgba(7,11,18,.72);border-bottom:1px solid var(--line)}
+  .nav{display:flex;align-items:center;justify-content:space-between;height:62px}
+  .brand{display:flex;align-items:center;gap:10px;font-family:var(--disp);font-weight:700;font-size:18px}
+  .brand b{color:var(--pulse)}
+  .mark{width:26px;height:26px;position:relative;display:grid;place-items:center}
+  .mark .core{width:8px;height:8px;border-radius:50%;background:var(--pulse);box-shadow:0 0 10px var(--pulse-glow)}
+  .mark .halo{position:absolute;inset:0;border-radius:50%;border:1.5px solid var(--pulse);opacity:.6;
+    animation:radar 2.6s ease-out infinite}
+  @keyframes radar{0%{transform:scale(.35);opacity:.9}100%{transform:scale(1);opacity:0}}
+  .who{font-family:var(--mono);font-size:13px;color:var(--muted);display:flex;align-items:center;gap:14px}
+  .plan-chip{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--pulse);
+    border:1px solid var(--line);border-radius:999px;padding:4px 10px;background:var(--surface)}
+
+  /* 3D buttons */
+  .btn{position:relative;display:inline-flex;align-items:center;gap:8px;font-family:var(--disp);
+    font-weight:600;font-size:14px;padding:11px 18px;border-radius:12px;cursor:pointer;border:0;
+    color:#04140f;background:linear-gradient(180deg,#5cf3c6,#2bd6a1 62%,#17b487);
+    box-shadow:0 1px 0 rgba(255,255,255,.5) inset,0 -2px 0 rgba(0,60,44,.35) inset,
+      0 10px 22px -10px var(--pulse-glow),0 3px 0 #0c7c63;transition:transform .12s,box-shadow .12s}
+  .btn:hover{transform:translateY(-2px)}
+  .btn:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(255,255,255,.4) inset,0 4px 10px -6px var(--pulse-glow),0 1px 0 #0c7c63}
+  .btn.ghost{color:var(--ink);background:var(--surface2);border:1px solid var(--line);
+    box-shadow:0 1px 0 rgba(255,255,255,.05) inset}
+  .btn.ghost:hover{background:rgba(255,255,255,.09)}
+  .btn.sm{padding:8px 13px;font-size:13px;border-radius:10px}
+  .btn.danger{background:none;color:var(--down);border:1px solid rgba(255,92,120,.3);box-shadow:none}
+  .btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+
+  h1{font-family:var(--disp);font-weight:700;font-size:26px;letter-spacing:-.02em}
+  .muted{color:var(--muted)} .dim{color:var(--dim)}
+  input,select{width:100%;background:#05080f;border:1px solid var(--line);border-radius:11px;
+    padding:12px 13px;color:var(--ink);font-family:var(--body);font-size:14.5px;outline:none}
+  input:focus,select:focus{border-color:var(--pulse);box-shadow:0 0 0 3px rgba(52,230,176,.12)}
+  label{font-size:12.5px;color:var(--muted);font-family:var(--mono);letter-spacing:.06em;
+    text-transform:uppercase;display:block;margin-bottom:6px}
+  .field{margin-bottom:14px}
+
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:24px}
+  .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+
+  /* gate (signup) */
+  #gate{max-width:440px;margin:9vh auto 0}
+  #gate .panel{box-shadow:0 40px 90px -40px #000}
+
+  /* app */
+  #app{display:none;padding:30px 0 80px}
+  .head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;margin-bottom:22px;flex-wrap:wrap}
+
+  .add{display:grid;grid-template-columns:1.3fr .7fr 1fr auto;gap:12px;align-items:end}
+  .add .btn{height:44px}
+  @media(max-width:820px){.add{grid-template-columns:1fr 1fr}}
+
+  .monitors{display:grid;gap:14px;margin-top:22px}
+  .mon{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:18px 20px;
+    display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center;
+    transition:border-color .18s,transform .18s}
+  .mon:hover{border-color:rgba(52,230,176,.35)}
+  .mon .name{font-family:var(--disp);font-weight:600;font-size:17px;display:flex;align-items:center;gap:10px}
+  .mon .ep{font-family:var(--mono);font-size:12px;color:var(--dim);margin-top:4px;
+    max-width:52ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .dot{width:10px;height:10px;border-radius:50%;flex:0 0 10px}
+  .dot.up{background:var(--up);box-shadow:0 0 10px var(--up)}
+  .dot.degraded{background:var(--degraded);box-shadow:0 0 10px var(--degraded)}
+  .dot.down{background:var(--down);box-shadow:0 0 10px var(--down)}
+  .dot.unknown{background:var(--dim)}
+  .stats{display:flex;gap:22px;align-items:center;margin-top:10px;font-size:13px;color:var(--muted);
+    font-family:var(--mono);flex-wrap:wrap}
+  .stats b{color:var(--ink);font-weight:500}
+  .g{font-family:var(--disp);font-weight:700}
+  .g.A,.g.B{color:var(--up)} .g.C,.g.D{color:var(--degraded)} .g.F{color:var(--down)}
+  .actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:#0c1526;
+    border:1px solid var(--line);border-radius:12px;padding:12px 18px;font-size:14px;
+    box-shadow:0 20px 50px -20px #000;opacity:0;pointer-events:none;transition:opacity .25s;z-index:60}
+  .toast.show{opacity:1}
+  .empty{text-align:center;color:var(--muted);padding:50px 20px;border:1px dashed var(--line);
+    border-radius:16px;margin-top:22px}
+  .badge-line{font-family:var(--mono);font-size:11.5px;color:var(--pulse);margin-top:8px;cursor:pointer}
+  footer{border-top:1px solid var(--line);padding:26px 0;margin-top:40px}
+  .sig{font-family:var(--mono);font-size:13px;color:var(--muted);text-align:center}
+  .sig b{color:var(--ink);font-weight:500}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important}}
+</style>
+</head>
+<body>
+
+<nav><div class="wrap nav">
+  <a class="brand" href="/"><span class="mark"><span class="halo"></span><span class="core"></span></span>MCP<b>Watch</b></a>
+  <div class="who" id="who"></div>
+</div></nav>
+
+<!-- auth gate -->
+<div id="gate"><div class="wrap"><div class="panel">
+  <h1 id="gate-title">Sign in to MCPWatch</h1>
+  <p class="muted" style="margin:6px 0 18px;font-size:14.5px">Monitor your MCP servers, get
+    alerts on regressions, and show a live status badge.</p>
+  <div class="field"><label>Email</label>
+    <input id="email" type="email" placeholder="you@company.com" autocomplete="email"></div>
+  <div class="field"><label>Password</label>
+    <input id="password" type="password" placeholder="at least 8 characters"
+      autocomplete="current-password" onkeydown="if(event.key==='Enter')submitAuth()"></div>
+  <div id="gate-err" style="color:var(--down);font-size:13px;min-height:16px;margin-bottom:6px"></div>
+  <div class="row">
+    <button class="btn" id="primary-btn" onclick="submitAuth()">Log in →</button>
+    <button class="btn ghost" onclick="toggleMode()" id="toggle-btn">Create account</button>
+  </div>
+  <div class="badge-line" style="margin-top:14px" onclick="forgot()">Forgot password?</div>
+</div></div></div>
+
+<!-- app -->
+<div id="app"><div class="wrap">
+  <div class="head">
+    <div><h1>Your monitors</h1><p class="muted" id="limitline"></p></div>
+    <a class="btn ghost sm" href="/" >← Landing</a>
+  </div>
+
+  <div class="panel">
+    <label style="margin-bottom:12px">Add a monitor</label>
+    <div class="add">
+      <div><label>Name</label><input id="m-name" placeholder="payments-mcp"></div>
+      <div><label>Kind</label>
+        <select id="m-kind">
+          <option value="http">http (URL)</option>
+          <option value="stdio">stdio (command)</option>
+        </select></div>
+      <div><label>Endpoint</label><input id="m-endpoint" placeholder="https://api.example.com/mcp"></div>
+      <button class="btn" onclick="addMonitor()">Add server</button>
+    </div>
+  </div>
+
+  <div id="list" class="monitors"></div>
+  <div id="empty" class="empty" style="display:none">
+    No monitors yet. Add your first MCP server above — try kind <b>stdio</b> with
+    <span class="mono">python scripts/demo_server.py</span> to see it grade instantly.
+  </div>
+
+  <footer><div class="sig">Designed &amp; built by <b>M. Junaid Shahid</b> ◆</div></footer>
+</div></div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = location.origin;
+let ME = null;
+let MODE = 'login';   // 'login' | 'signup'
+
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;
+  t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1900);}
+// Session is a same-origin httpOnly cookie; fetch sends it automatically. No token handling.
+function H(){return {'Content-Type':'application/json'};}
+function gateErr(m){document.getElementById('gate-err').textContent=m||'';}
+
+function toggleMode(){
+  MODE = MODE==='login' ? 'signup' : 'login';
+  document.getElementById('gate-title').textContent = MODE==='login' ? 'Sign in to MCPWatch' : 'Create your account';
+  document.getElementById('primary-btn').textContent = MODE==='login' ? 'Log in →' : 'Create account →';
+  document.getElementById('toggle-btn').textContent = MODE==='login' ? 'Create account' : 'I have an account';
+  gateErr('');
+}
+async function submitAuth(){
+  const email=document.getElementById('email').value.trim();
+  const password=document.getElementById('password').value;
+  if(!email||!password){gateErr('Email and password required');return;}
+  const path = MODE==='login' ? '/api/auth/login' : '/api/auth/signup';
+  const r=await fetch(API+path,{method:'POST',headers:H(),body:JSON.stringify({email,password})});
+  if(!r.ok){gateErr((await r.json().catch(()=>({}))).detail || 'Authentication failed');return;}
+  await boot();
+}
+async function forgot(){
+  const email=document.getElementById('email').value.trim();
+  if(!email){gateErr('Enter your email first');return;}
+  await fetch(API+'/api/auth/request-reset',{method:'POST',headers:H(),body:JSON.stringify({email})});
+  toast('If that account exists, a reset link was sent');
+}
+
+async function boot(){
+  const r=await fetch(API+'/api/me',{headers:H()});
+  if(!r.ok){show(false);return;}
+  ME=await r.json(); show(true);
+  document.getElementById('who').innerHTML=
+    `<span class="plan-chip">${ME.plan}</span> ${ME.user.email} · `+
+    `<a onclick="logout()" style="cursor:pointer;color:var(--muted)">sign out</a>`;
+  const max=ME.limits.max_monitors===-1?'unlimited':ME.limits.max_monitors;
+  document.getElementById('limitline').textContent=
+    `${ME.plan} plan · ${ME.usage.monitors}/${max} server(s) · checks every `+
+    `${Math.round(ME.limits.min_interval_seconds/60)} min · ${ME.usage.open_incidents} open incident(s)`;
+  load();
+}
+function show(app){document.getElementById('app').style.display=app?'block':'none';
+  document.getElementById('gate').style.display=app?'none':'block';}
+async function logout(){await fetch(API+'/api/auth/logout',{method:'POST',headers:H()});location.reload();}
+
+async function load(){
+  const r=await fetch(API+'/api/monitors',{headers:H()});
+  const mons=await r.json();
+  const list=document.getElementById('list');
+  document.getElementById('empty').style.display=mons.length?'none':'block';
+  list.innerHTML=mons.map(renderMon).join('');
+}
+function fmtUptime(u){return u==null?'—':(u*100).toFixed(u>=0.9995?2:1)+'%';}
+function fmtWhen(t){if(!t)return 'never';const s=Math.max(0,(Date.now()/1000-t));
+  if(s<60)return Math.round(s)+'s ago';if(s<3600)return Math.round(s/60)+'m ago';
+  return Math.round(s/3600)+'h ago';}
+function renderMon(m){
+  const st=m.last_status||'unknown';
+  const grade=m.last_grade?`<span class="g ${m.last_grade}">${m.last_grade}</span>`:'—';
+  const badge=`${API}/badge/${m.id}.svg`;
+  return `<div class="mon">
+    <div>
+      <div class="name"><span class="dot ${st}"></span>${esc(m.name)}
+        <span class="plan-chip" style="color:var(--muted)">${m.kind}</span></div>
+      <div class="ep">${esc(m.endpoint)}</div>
+      <div class="stats">
+        <span>status <b>${st}</b></span>
+        <span>grade ${grade}${m.last_score!=null?` <span class="dim">/ ${m.last_score}</span>`:''}</span>
+        <span>uptime 30d <b>${fmtUptime(m.uptime_30d)}</b></span>
+        <span>checked <b>${fmtWhen(m.last_checked_at)}</b></span>
+      </div>
+      <div class="badge-line" onclick="copyBadge('${badge}')">📛 ${badge} · click to copy</div>
+    </div>
+    <div class="actions">
+      <button class="btn sm" onclick="checkNow('${m.id}',this)">Check now</button>
+      <button class="btn ghost sm" onclick="viewChecks('${m.id}')">History</button>
+      <button class="btn danger sm" onclick="del('${m.id}')">Delete</button>
+    </div>
+  </div>`;
+}
+function esc(s){return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function copyBadge(url){const md=`![MCP status](${url})`;navigator.clipboard?.writeText(md);toast('Badge markdown copied');}
+
+async function addMonitor(){
+  const name=val('m-name'),kind=val('m-kind'),endpoint=val('m-endpoint');
+  if(!name||!endpoint){toast('Name and endpoint required');return;}
+  const r=await fetch(API+'/api/monitors',{method:'POST',headers:H(),
+    body:JSON.stringify({name,kind,endpoint})});
+  if(!r.ok){toast((await r.json().catch(()=>({}))).detail || 'Could not add monitor');return;}
+  document.getElementById('m-name').value='';document.getElementById('m-endpoint').value='';
+  toast('Monitor added — running first check…');
+  const m=await r.json(); await checkNow(m.id); load();
+}
+function val(id){return document.getElementById(id).value.trim();}
+
+async function checkNow(id,btn){
+  if(btn){btn.disabled=true;btn.textContent='Checking…';}
+  try{
+    const r=await fetch(API+`/api/monitors/${id}/check`,{method:'POST',headers:H(),
+      body:JSON.stringify({depth:'liveness'})});
+    const c=await r.json();
+    toast(`${c.status?.toUpperCase()||'DONE'} · grade ${c.grade||'—'} · ${c.latency_ms??'—'}ms`);
+  }catch(e){toast('Check failed');}
+  finally{if(btn){btn.disabled=false;btn.textContent='Check now';}load();}
+}
+async function del(id){
+  if(!confirm('Delete this monitor and its history?'))return;
+  await fetch(API+`/api/monitors/${id}`,{method:'DELETE',headers:H()});
+  toast('Deleted');load();
+}
+async function viewChecks(id){
+  const r=await fetch(API+`/api/monitors/${id}`,{headers:H()});
+  const d=await r.json();
+  const lines=(d.recent||[]).slice(0,10).map(c=>
+    `${new Date(c.checked_at*1000).toLocaleString()} — ${c.status} · ${c.grade||'—'} · ${c.latency_ms??'—'}ms`
+  ).join('\n')||'No checks yet.';
+  alert(`History — ${d.monitor.name}\nuptime 30d: ${fmtUptime(d.uptime_30d)}\n\n${lines}`);
+}
+
+// handle URL params: ?plan= (upgrade intent), ?verified=1, ?reset=<token>
+const params=new URLSearchParams(location.search);
+async function handleReset(token){
+  const pw=prompt('Enter a new password (min 8 chars):');
+  if(!pw)return;
+  const r=await fetch(API+'/api/auth/reset',{method:'POST',headers:H(),
+    body:JSON.stringify({token,password:pw})});
+  toast(r.ok?'Password updated — please log in':'Reset link invalid or expired');
+}
+if(params.get('reset')) handleReset(params.get('reset'));
+if(params.get('verified')==='1') setTimeout(()=>toast('Email verified ✓'),300);
+if(params.get('plan')) setTimeout(()=>toast(`Sign in, then upgrade to ${params.get('plan')}`),400);
+boot();
+</script>
+</body>
+</html>

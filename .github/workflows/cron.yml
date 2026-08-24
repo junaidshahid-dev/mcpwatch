@@ -1,0 +1,25 @@
+# Free serverless scheduler: GitHub Actions calls the app's run-due endpoint on a cadence.
+# The app stays a single stateless web service; this workflow is the heartbeat.
+#
+# Set two repository secrets (Settings -> Secrets and variables -> Actions):
+#   MCPWATCH_URL             e.g. https://mcpwatch.onrender.com
+#   MCPWATCH_SCHEDULER_TOKEN the same long random string the app uses
+name: mcpwatch-scheduler
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"   # every 15 minutes (GitHub's minimum granularity is ~5 min)
+  workflow_dispatch: {}       # allow manual runs
+
+jobs:
+  run-due:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger due checks
+        run: |
+          curl -sS -X POST "$MCPWATCH_URL/internal/run-due" \
+            -H "x-scheduler-token: $MCPWATCH_SCHEDULER_TOKEN" \
+            --fail-with-body
+        env:
+          MCPWATCH_URL: ${{ secrets.MCPWATCH_URL }}
+          MCPWATCH_SCHEDULER_TOKEN: ${{ secrets.MCPWATCH_SCHEDULER_TOKEN }}

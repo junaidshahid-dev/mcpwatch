@@ -1,0 +1,437 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MCPWatch — uptime & schema health for MCP servers</title>
+<meta name="description" content="MCPWatch pings every MCP server you depend on, grades its tool schemas 0–100, and alerts you the moment it goes down or degrades — before your agents do.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=Manrope:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --bg:#070b12; --bg2:#0a1120; --surface:rgba(255,255,255,.035);
+    --surface2:rgba(255,255,255,.055); --line:rgba(120,200,180,.14);
+    --ink:#e9f0fa; --muted:#8ea3c2; --dim:#5e6f8c;
+    --pulse:#34e6b0; --pulse-deep:#0f8f74; --pulse-glow:rgba(52,230,176,.45);
+    --up:#2ee6a6; --degraded:#ffb020; --down:#ff5c78; --gold:#e3c07a;
+    --disp:"Sora",system-ui,sans-serif;
+    --body:"Manrope",system-ui,sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+    --r:16px; --maxw:1120px;
+  }
+  *{box-sizing:border-box;margin:0}
+  html{scroll-behavior:smooth}
+  body{background:var(--bg);color:var(--ink);font-family:var(--body);line-height:1.6;
+    -webkit-font-smoothing:antialiased;overflow-x:hidden}
+  /* ambient background */
+  body::before{content:"";position:fixed;inset:0;z-index:-2;
+    background:
+      radial-gradient(80% 60% at 82% -5%, rgba(52,230,176,.16), transparent 60%),
+      radial-gradient(70% 55% at 5% 8%, rgba(46,90,160,.20), transparent 60%),
+      linear-gradient(180deg,#070b12,#060910 60%);}
+  body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.5;
+    background-image:linear-gradient(rgba(120,200,180,.05) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(120,200,180,.05) 1px,transparent 1px);
+    background-size:52px 52px;
+    mask-image:radial-gradient(120% 90% at 50% 0%,#000 0%,transparent 75%);}
+  a{color:inherit;text-decoration:none}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}
+  .mono{font-family:var(--mono)}
+
+  /* ---------- nav ---------- */
+  nav{position:sticky;top:0;z-index:50;backdrop-filter:blur(14px);
+    background:rgba(7,11,18,.72);border-bottom:1px solid var(--line)}
+  .nav{display:flex;align-items:center;justify-content:space-between;height:66px}
+  .brand{display:flex;align-items:center;gap:11px;font-family:var(--disp);font-weight:700;
+    font-size:19px;letter-spacing:-.02em}
+  .mark{width:30px;height:30px;position:relative;display:grid;place-items:center}
+  .mark .core{width:9px;height:9px;border-radius:50%;background:var(--pulse);
+    box-shadow:0 0 12px var(--pulse-glow)}
+  .mark .halo{position:absolute;inset:0;border-radius:50%;border:1.5px solid var(--pulse);
+    opacity:.6;animation:radar 2.6s ease-out infinite}
+  @keyframes radar{0%{transform:scale(.35);opacity:.9}100%{transform:scale(1);opacity:0}}
+  .brand b{color:var(--pulse)}
+  .nav-links{display:flex;align-items:center;gap:28px;font-size:14.5px;color:var(--muted)}
+  .nav-links a:hover{color:var(--ink)}
+  .nav-links .cta{color:var(--bg)}
+
+  /* ---------- 3D buttons ---------- */
+  .btn{--c:var(--pulse);position:relative;display:inline-flex;align-items:center;gap:9px;
+    font-family:var(--disp);font-weight:600;font-size:15px;letter-spacing:.01em;
+    padding:13px 22px;border-radius:13px;cursor:pointer;border:0;color:#04140f;
+    background:linear-gradient(180deg,#5cf3c6,#2bd6a1 62%,#17b487);
+    box-shadow:0 1px 0 rgba(255,255,255,.5) inset,0 -2px 0 rgba(0,60,44,.35) inset,
+      0 12px 24px -10px var(--pulse-glow),0 3px 0 #0c7c63;
+    transform:translateY(0);transition:transform .12s ease,box-shadow .12s ease}
+  .btn:hover{transform:translateY(-2px);
+    box-shadow:0 1px 0 rgba(255,255,255,.6) inset,0 -2px 0 rgba(0,60,44,.35) inset,
+      0 18px 34px -12px var(--pulse-glow),0 5px 0 #0c7c63}
+  .btn:active{transform:translateY(2px);
+    box-shadow:0 1px 0 rgba(255,255,255,.4) inset,0 -1px 0 rgba(0,60,44,.35) inset,
+      0 6px 14px -8px var(--pulse-glow),0 1px 0 #0c7c63}
+  .btn.ghost{color:var(--ink);background:var(--surface2);
+    border:1px solid var(--line);box-shadow:0 1px 0 rgba(255,255,255,.06) inset,0 8px 20px -14px #000}
+  .btn.ghost:hover{background:rgba(255,255,255,.09);transform:translateY(-2px)}
+  .btn.sm{padding:10px 16px;font-size:14px;border-radius:11px}
+
+  /* ---------- hero ---------- */
+  header.hero{padding:76px 0 40px}
+  .eyebrow{display:inline-flex;align-items:center;gap:9px;font-family:var(--mono);font-size:12.5px;
+    letter-spacing:.16em;text-transform:uppercase;color:var(--pulse);
+    border:1px solid var(--line);border-radius:999px;padding:7px 14px;background:var(--surface)}
+  .eyebrow .dot{width:7px;height:7px;border-radius:50%;background:var(--up);
+    box-shadow:0 0 9px var(--up);animation:blink 1.8s ease-in-out infinite}
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:.35}}
+  .hero-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:48px;align-items:center;margin-top:26px}
+  h1{font-family:var(--disp);font-weight:800;font-size:clamp(36px,5.4vw,60px);line-height:1.03;
+    letter-spacing:-.025em;text-wrap:balance}
+  h1 .c{color:var(--pulse)}
+  .lead{color:var(--muted);font-size:18.5px;max-width:36ch;margin-top:20px}
+  .hero-cta{display:flex;gap:14px;margin-top:30px;flex-wrap:wrap}
+  .trust{margin-top:26px;font-size:13.5px;color:var(--dim);display:flex;gap:18px;flex-wrap:wrap;
+    align-items:center;font-family:var(--mono)}
+  .trust b{color:var(--muted);font-weight:500}
+
+  /* live monitor card */
+  .scope{position:relative;border-radius:20px;padding:22px;background:
+      linear-gradient(180deg,rgba(18,28,44,.9),rgba(10,17,30,.9));
+    border:1px solid var(--line);
+    box-shadow:0 40px 80px -30px #000,inset 0 1px 0 rgba(255,255,255,.05)}
+  .scope-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+  .scope-name{display:flex;align-items:center;gap:10px;font-family:var(--disp);font-weight:600;font-size:15px}
+  .pill{font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;
+    padding:5px 11px;border-radius:999px;border:1px solid transparent}
+  .pill.up{color:var(--up);background:rgba(46,230,166,.10);border-color:rgba(46,230,166,.3)}
+  .ekg{width:100%;height:96px;display:block}
+  .ekg path{fill:none;stroke:var(--pulse);stroke-width:2.2;filter:drop-shadow(0 0 6px var(--pulse-glow));
+    stroke-dasharray:1400;stroke-dashoffset:1400;animation:draw 3.2s ease-out forwards}
+  @keyframes draw{to{stroke-dashoffset:0}}
+  .ekg .base{stroke:rgba(120,200,180,.16);stroke-width:1;filter:none;animation:none;stroke-dasharray:0}
+  .metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:16px}
+  .metric{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 13px}
+  .metric .k{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim)}
+  .metric .v{font-family:var(--disp);font-weight:700;font-size:24px;margin-top:3px}
+  .metric .v small{font-size:13px;color:var(--muted);font-weight:500}
+  .grade-A{color:var(--up)} .grade-hi{color:var(--pulse)}
+
+  /* ---------- sections ---------- */
+  section{padding:64px 0}
+  .kicker{font-family:var(--mono);font-size:12.5px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--pulse);text-align:center}
+  h2{font-family:var(--disp);font-weight:700;font-size:clamp(26px,3.4vw,38px);letter-spacing:-.02em;
+    text-align:center;margin-top:10px;text-wrap:balance}
+  .sub{color:var(--muted);text-align:center;max-width:56ch;margin:14px auto 0;font-size:16.5px}
+
+  .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:44px}
+  .step{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:26px;
+    position:relative;overflow:hidden}
+  .step .n{font-family:var(--mono);font-size:13px;color:var(--pulse);letter-spacing:.1em}
+  .step h3{font-family:var(--disp);font-weight:600;font-size:19px;margin:12px 0 8px}
+  .step p{color:var(--muted);font-size:15px}
+  .step::after{content:"";position:absolute;right:-40px;top:-40px;width:120px;height:120px;
+    background:radial-gradient(circle,var(--pulse-glow),transparent 70%);opacity:.25}
+
+  .feat{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:44px}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:24px;
+    transition:transform .18s ease,border-color .18s ease,background .18s ease}
+  .card:hover{transform:translateY(-4px);border-color:rgba(52,230,176,.4);background:var(--surface2)}
+  .card .ico{width:40px;height:40px;border-radius:11px;display:grid;place-items:center;
+    background:rgba(52,230,176,.12);border:1px solid var(--line);margin-bottom:14px;font-size:19px}
+  .card h3{font-family:var(--disp);font-weight:600;font-size:17.5px;margin-bottom:7px}
+  .card p{color:var(--muted);font-size:14.5px}
+
+  /* badge showcase */
+  .badge-show{display:grid;grid-template-columns:1fr 1fr;gap:36px;align-items:center;margin-top:40px;
+    background:linear-gradient(180deg,rgba(18,28,44,.7),rgba(10,17,30,.6));
+    border:1px solid var(--line);border-radius:22px;padding:34px}
+  .badge-demo{display:flex;gap:12px;flex-wrap:wrap;margin:8px 0 18px}
+  .snippet{font-family:var(--mono);font-size:12.5px;background:#05080f;border:1px solid var(--line);
+    border-radius:12px;padding:14px;color:#9fd8c6;overflow-x:auto;position:relative}
+  .copy{position:absolute;top:9px;right:9px}
+  svg.badgeimg{height:22px;filter:drop-shadow(0 4px 10px rgba(0,0,0,.4))}
+
+  /* pricing */
+  .prices{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:44px;align-items:stretch}
+  .price{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:28px;
+    display:flex;flex-direction:column;position:relative}
+  .price.feature{border-color:rgba(52,230,176,.5);background:
+      linear-gradient(180deg,rgba(52,230,176,.08),var(--surface));
+    box-shadow:0 30px 70px -34px var(--pulse-glow)}
+  .price .tag{position:absolute;top:-11px;left:50%;transform:translateX(-50%);
+    font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;
+    background:var(--pulse);color:#04140f;padding:4px 12px;border-radius:999px;font-weight:600}
+  .price .pn{font-family:var(--disp);font-weight:600;font-size:19px}
+  .price .pp{font-family:var(--disp);font-weight:800;font-size:42px;margin:8px 0 2px;letter-spacing:-.02em}
+  .price .pp small{font-size:15px;color:var(--muted);font-weight:500}
+  .price ul{list-style:none;margin:18px 0 24px;padding:0;display:grid;gap:11px}
+  .price li{font-size:14.5px;color:var(--muted);display:flex;gap:10px;align-items:flex-start}
+  .price li::before{content:"";width:18px;height:18px;flex:0 0 18px;margin-top:2px;border-radius:50%;
+    background:rgba(52,230,176,.14);border:1px solid var(--line);
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2334e6b0' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:center}
+  .price .btn{width:100%;justify-content:center;margin-top:auto}
+
+  /* faq */
+  .faq{max-width:760px;margin:40px auto 0;display:grid;gap:12px}
+  details{background:var(--surface);border:1px solid var(--line);border-radius:13px;padding:4px 20px}
+  summary{cursor:pointer;padding:16px 0;font-family:var(--disp);font-weight:600;font-size:16px;
+    list-style:none;display:flex;justify-content:space-between;align-items:center}
+  summary::-webkit-details-marker{display:none}
+  summary::after{content:"+";color:var(--pulse);font-size:22px;font-weight:400}
+  details[open] summary::after{content:"−"}
+  details p{color:var(--muted);font-size:15px;padding:0 0 18px}
+
+  /* cta band */
+  .band{text-align:center;background:
+      radial-gradient(70% 120% at 50% 0%,rgba(52,230,176,.14),transparent 60%);
+    border:1px solid var(--line);border-radius:24px;padding:56px 24px;margin-top:24px}
+
+  /* footer */
+  footer{border-top:1px solid var(--line);margin-top:70px;padding:40px 0 60px}
+  .foot{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:18px}
+  .sig{font-family:var(--mono);font-size:13.5px;color:var(--muted)}
+  .sig b{color:var(--ink);font-weight:500}
+  .sig .heart{color:var(--down)}
+  .foot-links{display:flex;gap:22px;font-size:14px;color:var(--muted)}
+  .foot-links a:hover{color:var(--pulse)}
+
+  @media (max-width:860px){
+    .hero-grid,.badge-show{grid-template-columns:1fr}
+    .steps,.feat,.prices{grid-template-columns:1fr}
+    .nav-links a:not(.cta){display:none}
+    .scope{margin-top:8px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{animation:none!important;scroll-behavior:auto}
+    .ekg path{stroke-dashoffset:0}
+  }
+</style>
+</head>
+<body>
+
+<nav><div class="wrap nav">
+  <a class="brand" href="/">
+    <span class="mark"><span class="halo"></span><span class="core"></span></span>
+    MCP<b>Watch</b>
+  </a>
+  <div class="nav-links">
+    <a href="#how">How it works</a>
+    <a href="#features">Features</a>
+    <a href="#pricing">Pricing</a>
+    <a class="btn sm cta" href="/dashboard">Open dashboard →</a>
+  </div>
+</div></nav>
+
+<header class="hero"><div class="wrap">
+  <span class="eyebrow"><span class="dot"></span> Monitoring for the Model Context Protocol</span>
+  <div class="hero-grid">
+    <div>
+      <h1>Know the second your <span class="c">MCP server</span> breaks.</h1>
+      <p class="lead">MCPWatch pings every MCP server your agents depend on, grades its tool
+        schemas 0–100, and alerts you the moment it goes down or degrades — before your agents do.</p>
+      <div class="hero-cta">
+        <a class="btn" href="/dashboard">Start monitoring — free</a>
+        <a class="btn ghost" href="#badge">See a live badge</a>
+      </div>
+      <div class="trust">
+        <span><b>◇</b> No credit card</span>
+        <span><b>◇</b> 1 server free, forever</span>
+        <span><b>◇</b> Badge in 2 minutes</span>
+      </div>
+    </div>
+
+    <div class="scope" aria-label="Live monitor preview">
+      <div class="scope-top">
+        <span class="scope-name"><span class="mark" style="width:20px;height:20px"><span class="core"></span></span> payments-mcp</span>
+        <span class="pill up">● operational</span>
+      </div>
+      <svg class="ekg" viewBox="0 0 600 96" preserveAspectRatio="none" aria-hidden="true">
+        <line class="base" x1="0" y1="70" x2="600" y2="70"/>
+        <path d="M0,70 L120,70 L140,70 L150,34 L162,92 L176,18 L188,70 L300,70 L330,70
+                 L345,52 L358,70 L470,70 L490,70 L500,40 L512,90 L526,26 L540,70 L600,70"/>
+      </svg>
+      <div class="metrics">
+        <div class="metric"><div class="k">Status</div><div class="v grade-hi">Up</div></div>
+        <div class="metric"><div class="k">Schema</div><div class="v grade-A">A <small>/ 93</small></div></div>
+        <div class="metric"><div class="k">Latency</div><div class="v">41<small>ms</small></div></div>
+        <div class="metric"><div class="k">Tools</div><div class="v">12</div></div>
+        <div class="metric"><div class="k">Uptime 30d</div><div class="v">99.9<small>%</small></div></div>
+        <div class="metric"><div class="k">Checks</div><div class="v">hourly</div></div>
+      </div>
+    </div>
+  </div>
+</div></header>
+
+<section id="how"><div class="wrap">
+  <div class="kicker">How it works</div>
+  <h2>Three steps to peace of mind</h2>
+  <p class="sub">Point MCPWatch at a server. It does the watching, the grading, and the shouting.</p>
+  <div class="steps">
+    <div class="step"><div class="n">STEP 01</div><h3>Add your server</h3>
+      <p>Paste a launch command (stdio) or an HTTPS endpoint. Local dev tools and remote
+        production servers alike.</p></div>
+    <div class="step"><div class="n">STEP 02</div><h3>We probe on a schedule</h3>
+      <p>MCPWatch connects, lists tools, measures latency, and grades every advertised schema
+        0–100 — with zero adversarial traffic, safe to run anywhere.</p></div>
+    <div class="step"><div class="n">STEP 03</div><h3>Get alerted, show a badge</h3>
+      <p>An email hits your inbox the moment a server drops or its grade regresses. A public
+        status badge proves your uptime to everyone else.</p></div>
+  </div>
+</div></section>
+
+<section id="features"><div class="wrap">
+  <div class="kicker">What you get</div>
+  <h2>Observability built for MCP</h2>
+  <div class="feat">
+    <div class="card"><div class="ico">🩺</div><h3>Schema health grade</h3>
+      <p>Every tool scored on description, typing and validation — a single 0–100 grade and A–F
+        letter, powered by the open-source mcp-probe engine.</p></div>
+    <div class="card"><div class="ico">⏱️</div><h3>Uptime & latency</h3>
+      <p>Reachability and response time tracked on every check, with a rolling 30-day uptime
+        ratio per server.</p></div>
+    <div class="card"><div class="ico">🔔</div><h3>Regression alerts</h3>
+      <p>Get emailed when a server goes down, recovers, or its grade slips a letter — the
+        difference between B and D is a shipped bug.</p></div>
+    <div class="card"><div class="ico">🛰️</div><h3>Remote & local</h3>
+      <p>Monitors Streamable-HTTP production servers and stdio dev tools through one interface,
+        with session handling built in.</p></div>
+    <div class="card"><div class="ico">🛡️</div><h3>On-demand deep audit</h3>
+      <p>For servers you own, run the full adversarial fuzz — hundreds of malformed payloads —
+        gated so you never hammer someone else's live backend.</p></div>
+    <div class="card"><div class="ico">📛</div><h3>Public status badge</h3>
+      <p>An embeddable SVG for your README that shows live status and grade — trust, earned
+        automatically.</p></div>
+  </div>
+</div></section>
+
+<section id="badge"><div class="wrap">
+  <div class="kicker">Growth loop</div>
+  <h2>A badge that markets itself</h2>
+  <div class="badge-show">
+    <div>
+      <p style="color:var(--muted);font-size:16px">Drop one line in your README. Everyone who
+        visits your repo sees your server is healthy — and where that badge came from.</p>
+      <div class="badge-demo" aria-hidden="true">
+        <svg class="badgeimg" viewBox="0 0 168 20" xmlns="http://www.w3.org/2000/svg">
+          <rect width="98" height="20" rx="3" fill="#24292f"/><rect x="98" width="70" height="20" rx="3" fill="#2ea043"/>
+          <g fill="#fff" font-family="Verdana,sans-serif" font-size="11">
+            <text x="10" y="14">payments-mcp</text><text x="108" y="14">UP · A</text></g>
+        </svg>
+        <svg class="badgeimg" viewBox="0 0 150 20" xmlns="http://www.w3.org/2000/svg">
+          <rect width="70" height="20" rx="3" fill="#24292f"/><rect x="70" width="80" height="20" rx="3" fill="#d29922"/>
+          <g fill="#fff" font-family="Verdana,sans-serif" font-size="11">
+            <text x="10" y="14">search-mcp</text><text x="80" y="14">DEGRADED</text></g>
+        </svg>
+      </div>
+      <div class="snippet">![MCP status](https://mcpwatch.dev/badge/&lt;your-id&gt;.svg)
+        <button class="btn ghost sm copy" onclick="copySnippet(this)">Copy</button></div>
+    </div>
+    <div class="scope">
+      <div class="scope-top"><span class="scope-name">status.mcpwatch.dev</span>
+        <span class="pill up">● public</span></div>
+      <div class="metrics" style="grid-template-columns:1fr 1fr">
+        <div class="metric"><div class="k">This month</div><div class="v grade-A">99.97<small>%</small></div></div>
+        <div class="metric"><div class="k">Incidents</div><div class="v">0</div></div>
+        <div class="metric"><div class="k">Avg latency</div><div class="v">38<small>ms</small></div></div>
+        <div class="metric"><div class="k">Grade</div><div class="v grade-A">A</div></div>
+      </div>
+    </div>
+  </div>
+</div></section>
+
+<section id="pricing"><div class="wrap">
+  <div class="kicker">Pricing</div>
+  <h2>Start free. Upgrade when it's critical.</h2>
+  <p class="sub">Billed through LemonSqueezy — global cards, taxes handled, cancel anytime.</p>
+  <div class="prices">
+    <div class="price">
+      <div class="pn">Free</div>
+      <div class="pp">$0<small>/mo</small></div>
+      <ul>
+        <li>1 monitored server</li>
+        <li>Daily health checks</li>
+        <li>Schema grade & uptime</li>
+        <li>Public status badge</li>
+      </ul>
+      <a class="btn ghost" href="/dashboard">Get started</a>
+    </div>
+    <div class="price feature">
+      <div class="tag">Most popular</div>
+      <div class="pn">Pro</div>
+      <div class="pp">$19<small>/mo</small></div>
+      <ul>
+        <li>10 monitored servers</li>
+        <li>Hourly checks</li>
+        <li>Email regression alerts</li>
+        <li>On-demand deep audits</li>
+        <li>Everything in Free</li>
+      </ul>
+      <a class="btn" href="/dashboard?plan=pro">Start Pro</a>
+    </div>
+    <div class="price">
+      <div class="pn">Team</div>
+      <div class="pp">$49<small>/mo</small></div>
+      <ul>
+        <li>Unlimited servers</li>
+        <li>Checks every 15 minutes</li>
+        <li>Alerts & deep audits</li>
+        <li>Team access</li>
+        <li>Priority support</li>
+      </ul>
+      <a class="btn ghost" href="/dashboard?plan=team">Start Team</a>
+    </div>
+  </div>
+</div></section>
+
+<section><div class="wrap">
+  <div class="kicker">Questions</div>
+  <h2>Good to know</h2>
+  <div class="faq">
+    <details open><summary>What exactly is an MCP server?</summary>
+      <p>A Model Context Protocol server exposes tools and data to AI agents (like Claude) as
+        typed, callable functions. If your agent stops being able to reach one — or the server
+        starts advertising broken schemas — your agent silently fails. MCPWatch catches that.</p></details>
+    <details><summary>Does monitoring send attack traffic to my servers?</summary>
+      <p>No. Scheduled checks are read-only: connect, list tools, statically grade the schemas.
+        The full adversarial fuzz is opt-in, on-demand, and only permitted on servers you mark
+        as owned.</p></details>
+    <details><summary>Can it monitor remote production servers?</summary>
+      <p>Yes — MCPWatch speaks the Streamable HTTP transport (including SSE responses and session
+        ids), as well as launching local stdio servers.</p></details>
+    <details><summary>How does the schema grade work?</summary>
+      <p>It's the open-source mcp-probe engine: each tool is scored independently on description,
+        typing and input validation, then averaged into a 0–100 score and A–F grade, so a big
+        server isn't punished for its size.</p></details>
+  </div>
+</div></section>
+
+<section><div class="wrap">
+  <div class="band">
+    <div class="kicker">Ready?</div>
+    <h2>Stop finding out from your users.</h2>
+    <p class="sub">Add your first MCP server and get a status badge in the next two minutes.</p>
+    <div style="margin-top:26px"><a class="btn" href="/dashboard">Start monitoring — free</a></div>
+  </div>
+</div></section>
+
+<footer><div class="wrap foot">
+  <div class="sig">Designed &amp; built by <b>M. Junaid Shahid</b> <span class="heart">◆</span>
+    &nbsp;·&nbsp; Lahore, Pakistan</div>
+  <div class="foot-links">
+    <a href="https://github.com/junaidshahid-dev" target="_blank" rel="noopener">GitHub</a>
+    <a href="https://junaidshahid-dev.github.io" target="_blank" rel="noopener">Portfolio</a>
+    <a href="/dashboard">Dashboard</a>
+  </div>
+</div></footer>
+
+<script>
+  function copySnippet(btn){
+    const txt = btn.parentElement.textContent.replace('Copy','').trim();
+    navigator.clipboard?.writeText(txt);
+    const o = btn.textContent; btn.textContent = 'Copied ✓';
+    setTimeout(()=>btn.textContent=o, 1400);
+  }
+</script>
+</body>
+</html>

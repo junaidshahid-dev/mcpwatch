@@ -1,0 +1,102 @@
+name: CI
+
+# Runs on every push and PR. Fails if the backend gate breaks on either backend, if migrations
+# don't apply from zero / aren't idempotent, if authorization or concurrency invariants regress
+# (both are inside the gate), if the frontend build/lint/typecheck fails, or if a critical
+# dependency vuln or a committed secret is found.
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend — SQLite + Postgres (33/33)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: mcpwatch
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      MCP_PROBE_PATH: ${{ runner.temp }}/mcp-probe
+      PG_URL: postgresql://postgres:postgres@localhost:5432/mcpwatch
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Fetch grading engine (mcp-probe)
+        run: git clone --depth 1 https://github.com/junaidshahid-dev/mcp-probe "$MCP_PROBE_PATH"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Migrations from zero + idempotency (Postgres)
+        run: python scripts/verify_pg_migrations.py
+        env:
+          DATABASE_URL: ${{ env.PG_URL }}
+
+      - name: Test gate on Postgres (authz, concurrency, SSRF, incidents, billing)
+        run: python tests/test_mcpwatch.py
+        env:
+          DATABASE_URL: ${{ env.PG_URL }}
+
+      - name: Test gate on SQLite
+        run: python tests/test_mcpwatch.py
+
+  frontend:
+    name: Frontend — lint, typecheck, build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web-next
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: web-next/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run build
+
+  security:
+    name: Security — deps + secrets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0            # full history for secret scanning
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Python dependency audit (pip-audit — fails on any known vuln)
+        run: |
+          pip install pip-audit
+          pip-audit -r requirements.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Frontend dependency audit (npm — fails on critical)
+        working-directory: web-next
+        # Gate blocks on CRITICAL (none present). The remaining high/moderate advisories are
+        # build-time transitive in Next's toolchain (postcss/sharp) and are documented, with
+        # exact IDs, paths and rationale, in web-next/SECURITY-NOTES.md — reviewed each bump.
+        run: npm audit --audit-level=critical
+      - name: Secret scanning (gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

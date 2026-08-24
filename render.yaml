@@ -1,0 +1,41 @@
+# Render blueprint. Create a Render account, connect this repo, "New > Blueprint".
+# Provisions a managed Postgres + the web service, and wires DATABASE_URL between them.
+# Scheduling is handled by .github/workflows/cron.yml hitting /internal/run-due.
+databases:
+  - name: mcpwatch-db
+    plan: basic-256mb        # 'free' works to start; upgrade as you grow
+    databaseName: mcpwatch
+    user: mcpwatch
+
+services:
+  - type: web
+    name: mcpwatch
+    runtime: docker
+    plan: starter
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: mcpwatch-db
+          property: connectionString   # migrations auto-apply on startup
+      - key: MCPWATCH_ALLOW_STDIO
+        value: "false"                  # no arbitrary command execution on the hosted plane
+      - key: MCPWATCH_SSRF_ALLOW_PRIVATE
+        value: "false"
+      - key: MCPWATCH_SCHEDULER_TOKEN
+        generateValue: true             # reuse this value in the cron workflow secret
+      - key: MCPWATCH_BASE_URL
+        sync: false                     # set to your Render URL after first deploy
+      - key: RESEND_API_KEY
+        sync: false
+      - key: MCPWATCH_ALERT_FROM
+        sync: false
+      - key: LEMONSQUEEZY_STORE_URL
+        sync: false
+      - key: LEMONSQUEEZY_WEBHOOK_SECRET
+        sync: false
+      - key: LEMONSQUEEZY_VARIANT_PRO
+        sync: false
+      - key: LEMONSQUEEZY_VARIANT_TEAM
+        sync: false

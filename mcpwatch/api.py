@@ -499,6 +499,28 @@ def _send_verification(user: dict, token: str) -> None:
                    f"Welcome to MCPWatch. Confirm your email:\n{link}")
 
 
+@app.get("/robots.txt")
+def robots() -> Response:
+    base = SETTINGS.base_url.rstrip("/")
+    body = ("User-agent: *\n"
+            "Allow: /\n"
+            "Disallow: /api/\n"
+            "Disallow: /dashboard\n"
+            "Disallow: /internal/\n"
+            f"Sitemap: {base}/sitemap.xml\n")
+    return Response(body, media_type="text/plain")
+
+
+@app.get("/sitemap.xml")
+def sitemap() -> Response:
+    base = SETTINGS.base_url.rstrip("/")
+    xml = ('<?xml version="1.0" encoding="UTF-8"?>\n'
+           '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+           f'  <url><loc>{base}/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>\n'
+           '</urlset>\n')
+    return Response(xml, media_type="application/xml")
+
+
 @app.get("/")
 def index() -> FileResponse:
     return FileResponse(WEB / "index.html")

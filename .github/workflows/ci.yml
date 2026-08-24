@@ -29,28 +29,27 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 15
-    env:
-      MCP_PROBE_PATH: ${{ runner.temp }}/mcp-probe
-      PG_URL: postgresql://postgres:postgres@localhost:5432/mcpwatch
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - name: Fetch grading engine (mcp-probe)
-        run: git clone --depth 1 https://github.com/junaidshahid-dev/mcp-probe "$MCP_PROBE_PATH"
+        run: |
+          git clone --depth 1 https://github.com/junaidshahid-dev/mcp-probe "$RUNNER_TEMP/mcp-probe"
+          echo "MCP_PROBE_PATH=$RUNNER_TEMP/mcp-probe" >> "$GITHUB_ENV"
       - name: Install dependencies
         run: pip install -r requirements.txt
 
       - name: Migrations from zero + idempotency (Postgres)
         run: python scripts/verify_pg_migrations.py
         env:
-          DATABASE_URL: ${{ env.PG_URL }}
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/mcpwatch
 
       - name: Test gate on Postgres (authz, concurrency, SSRF, incidents, billing)
         run: python tests/test_mcpwatch.py
         env:
-          DATABASE_URL: ${{ env.PG_URL }}
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/mcpwatch
 
       - name: Test gate on SQLite
         run: python tests/test_mcpwatch.py
